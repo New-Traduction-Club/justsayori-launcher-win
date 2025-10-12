@@ -1,0 +1,79 @@
+<UserControl x:Class="justsayo_win.SettingsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Triggers>
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard Storyboard="{DynamicResource SlideInAnimation}"/>
+        </EventTrigger>
+    </UserControl.Triggers>
+    
+    <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="40, 40, 40, 0">
+            <TextBlock Text="Settings" FontSize="36" FontWeight="Bold" Foreground="White" Margin="0,0,0,30"/>
+
+            <WrapPanel>
+                <!-- game management section -->
+                <Border Background="#22FFFFFF" CornerRadius="5" Padding="20" Width="400" Margin="0,0,20,20">
+                    <StackPanel>
+                        <TextBlock Text="Game Management" FontSize="20" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,15"/>
+
+                        <!-- default view -->
+                        <StackPanel Visibility="{Binding IsConfirmingUninstall, Converter={StaticResource InverseBooleanToVisibilityConverter}}">
+                            <TextBlock Text="The game is not currently installed." Foreground="#CCFFFFFF" TextWrapping="Wrap"
+                                       Visibility="{Binding IsGameInstalled, Converter={StaticResource InverseBooleanToVisibilityConverter}}"/>
+
+                            <TextBlock Text="Uninstall the game from your computer. This action cannot be undone." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,20"
+                                       Visibility="{Binding IsGameInstalled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                            <Button Content="Uninstall Game" 
+                                    Command="{Binding UninstallCommand}"
+                                    Background="#FFF38BA8" Foreground="#FF1E1E2E"
+                                    FontSize="16" FontWeight="Bold" Padding="20,10" HorizontalAlignment="Left" BorderThickness="0"
+                                    Visibility="{Binding IsGameInstalled, Converter={StaticResource BooleanToVisibilityConverter}}"/>
+                        </StackPanel>
+
+                        <!-- confirmation view -->
+                        <StackPanel Visibility="{Binding IsConfirmingUninstall, Converter={StaticResource BooleanToVisibilityConverter}}">
+                            <TextBlock Text="This will permanently delete all game and submod files. Are you sure?" Foreground="#FFFFD966" TextWrapping="Wrap" Margin="0,0,0,20" FontWeight="SemiBold"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Yes, Uninstall" 
+                                        Command="{Binding ConfirmUninstallCommand}"
+                                        Background="#FFF38BA8" Foreground="#FF1E1E2E"
+                                        FontSize="16" FontWeight="Bold" Padding="20,10" HorizontalAlignment="Left" BorderThickness="0" Margin="0,0,10,0"/>
+                                <Button Content="Cancel" 
+                                        Command="{Binding CancelUninstallCommand}"
+                                        Background="#55FFFFFF" Foreground="White"
+                                        FontSize="16" FontWeight="Bold" Padding="20,10" HorizontalAlignment="Left" BorderThickness="0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <ProgressBar IsIndeterminate="True" Height="5" Margin="0,10,0,0"
+                                     Visibility="{Binding IsUninstalling, Converter={StaticResource BooleanToVisibilityConverter}}" 
+                                     BorderThickness="0" Background="Transparent" Foreground="#FFF38BA8"/>
+
+                    </StackPanel>
+                </Border>
+
+                <!-- launcher section -->
+                <Border Background="#22FFFFFF" CornerRadius="5" Padding="20" Width="400" Margin="0,0,20,20">
+                    <StackPanel>
+                        <TextBlock Text="On Game Launch" FontSize="20" FontWeight="SemiBold" Foreground="White" Margin="0,0,0,15"/>
+                        <TextBlock Text="Choose what the launcher should do when you start the game." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,20"/>
+
+                        <RadioButton Content="Do nothing" GroupName="LaunchBehavior" Foreground="White" Margin="0,0,0,10"
+                                     IsChecked="{Binding Path=SelectedLaunchBehavior, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=DoNothing}"/>
+                        
+                        <RadioButton Content="Close launcher" GroupName="LaunchBehavior" Foreground="White" Margin="0,0,0,10"
+                                     IsChecked="{Binding Path=SelectedLaunchBehavior, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Close}"/>
+                        
+                        <RadioButton Content="Minimize to tray" GroupName="LaunchBehavior" Foreground="White"
+                                     IsChecked="{Binding Path=SelectedLaunchBehavior, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=MinimizeToTray}"/>
+                    </StackPanel>
+                </Border>
+            </WrapPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

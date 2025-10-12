@@ -4,16 +4,20 @@ VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "justsayo-win", "justsayo-win.csproj", "{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}"
 EndProject
+Project("{54435603-DBB4-11D2-8724-00A0C9A8B90C}") = "JustSayoriLauncherSetup", "..\JustSayoriLauncherSetup\JustSayoriLauncherSetup.vdproj", "{CDBD1AD4-908B-DF7D-A48B-CA4ED209C187}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
 		Release|Any CPU = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}.Debug|Any CPU.ActiveCfg = Release|Any CPU
+		{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}.Debug|Any CPU.Build.0 = Release|Any CPU
 		{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D7D68AC5-C12B-DD6E-9CB3-670313CE0CFE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{CDBD1AD4-908B-DF7D-A48B-CA4ED209C187}.Debug|Any CPU.ActiveCfg = Release
+		{CDBD1AD4-908B-DF7D-A48B-CA4ED209C187}.Release|Any CPU.ActiveCfg = Release
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

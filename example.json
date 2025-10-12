@@ -1,0 +1,11 @@
+{
+  "proyectos": [
+    {
+      "id_proyecto": "just-sayori",
+      "titulo": "Just Sayori",
+      "version": "1.1.0",
+      "url_descarga": "https://static-trad-club.nyc3.cdn.digitaloceanspaces.com/JustSayori/Just.Sayori.1.0.1.zip",
+      "nombre_ejecutable": "JustSayori.exe"
+    }
+  ]
+}

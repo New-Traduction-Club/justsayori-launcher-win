@@ -1,0 +1,141 @@
+<UserControl x:Class="justsayo_win.SubmodsView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" 
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008" 
+             mc:Ignorable="d" 
+             xmlns:local="clr-namespace:justsayo_win"
+             d:DesignHeight="450" d:DesignWidth="800">
+    <UserControl.Triggers>
+        <EventTrigger RoutedEvent="Loaded">
+            <BeginStoryboard Storyboard="{DynamicResource SlideInAnimation}"/>
+        </EventTrigger>
+    </UserControl.Triggers>
+    
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+
+        <!-- style for the filter buttons -->
+        <Style x:Key="FilterButtonStyle" TargetType="RadioButton" BasedOn="{StaticResource {x:Type RadioButton}}">
+            <Setter Property="Background" Value="#33FFFFFF"/>
+            <Setter Property="Foreground" Value="#CCFFFFFF"/>
+            <Setter Property="Padding" Value="15,8"/>
+            <Setter Property="Margin" Value="0,0,10,0"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border Background="{TemplateBinding Background}" CornerRadius="15">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="{TemplateBinding Padding}"/>
+                        </Border>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#55FFFFFF"/>
+                </Trigger>
+                <Trigger Property="IsChecked" Value="True">
+                    <Setter Property="Background" Value="#FF89B4FA"/>
+                    <Setter Property="Foreground" Value="#FF1E1E2E"/>
+                    <Setter Property="FontWeight" Value="Bold"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid>
+        <ContentControl Content="{Binding CurrentSubmodView}">
+            <ContentControl.Resources>
+                <DataTemplate DataType="{x:Type local:SubmodsViewModel}">
+                    <Grid Margin="40">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <TextBlock Grid.Row="0" Text="Submods" FontSize="36" FontWeight="Bold" Foreground="White" Margin="0,0,0,10"/>
+
+                        <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,20">
+                            <RadioButton Content="Submods" GroupName="SubmodFilter" Style="{StaticResource FilterButtonStyle}"
+                                         IsChecked="{Binding Path=SelectedFilter, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Submod}"/>
+                            <RadioButton Content="Backgrounds" GroupName="SubmodFilter" Style="{StaticResource FilterButtonStyle}"
+                                         IsChecked="{Binding Path=SelectedFilter, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Background}"/>
+                            <RadioButton Content="Outfits" GroupName="SubmodFilter" Style="{StaticResource FilterButtonStyle}"
+                                         IsChecked="{Binding Path=SelectedFilter, Converter={StaticResource EnumToBooleanConverter}, ConverterParameter=Outfit}"/>
+                        </StackPanel>
+
+                        <!-- submod cards -->
+                        <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <ItemsControl ItemsSource="{Binding FilteredSubmods}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <WrapPanel/>
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding DataContext.SelectSubmodCommand, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                                CommandParameter="{Binding}"
+                                                Style="{StaticResource {x:Static ToolBar.ButtonStyleKey}}">
+                                            <Border Width="320" Height="270" Background="#22FFFFFF" CornerRadius="8" Margin="10">
+                                                <Grid>
+                                                    <Grid.RowDefinitions>
+                                                        <RowDefinition Height="180"/>
+                                                        <RowDefinition Height="*"/>
+                                                    </Grid.RowDefinitions>
+
+                                                    <!-- 16:9 image -->
+                                                    <Border Grid.Row="0" CornerRadius="8,8,0,0" Background="#11000000">
+                                                        <Image Source="{Binding PreviewImageUrl}" Stretch="UniformToFill"/>
+                                                    </Border>
+
+                                                    <!-- details -->
+                                                    <StackPanel Grid.Row="1" Margin="15">
+                                                        <TextBlock Text="{Binding Name}" Foreground="White" FontSize="18" FontWeight="Bold" TextTrimming="CharacterEllipsis"/>
+                                                        <TextBlock Foreground="#CCFFFFFF" FontSize="13" Margin="0,2,0,0">
+                                                            <Run Text="by"/>
+                                                            <Run Text="{Binding Author}"/>
+                                                            <Run Text=" - v"/>
+                                                            <Run Text="{Binding Version}"/>
+                                                        </TextBlock>
+                                                    </StackPanel>
+
+                                                    <!-- tags -->
+                                                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="10">
+                                                        <Border Background="#FFA6E3A1" CornerRadius="10" Padding="8,3" Margin="5,0"
+                                                                Visibility="{Binding Status, ConverterParameter=Installed, Converter={StaticResource SubmodStatusToVisibilityConverter}}">
+                                                            <TextBlock Text="Installed" Foreground="#FF1E1E2E" FontSize="11" FontWeight="Bold"/>
+                                                        </Border>
+                                                        <Border Background="#FFFAB387" CornerRadius="10" Padding="8,3" Margin="5,0"
+                                                                Visibility="{Binding Status, ConverterParameter=UpdateAvailable, Converter={StaticResource SubmodStatusToVisibilityConverter}}">
+                                                            <TextBlock Text="Update Available" Foreground="#FF1E1E2E" FontSize="11" FontWeight="Bold"/>
+                                                        </Border>
+                                                    </StackPanel>
+                                                </Grid>
+                                            </Border>
+                                        </Button>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </ScrollViewer>
+
+                        <!-- footer... -->
+                        <Border Grid.Row="2" Background="#FF181825" VerticalAlignment="Bottom" Margin="-40,0,-40,0" Padding="20,10">
+                            <TextBlock Foreground="#CCFFFFFF" TextAlignment="Center">
+                                <Run>Are you a submod creator? To have your submod featured in the launcher, please contact us on Discord!</Run>
+                            </TextBlock>
+                        </Border>
+                    </Grid>
+                </DataTemplate>
+
+                <DataTemplate DataType="{x:Type local:SubmodItem}">
+                    <local:SubmodDetailView/>
+                </DataTemplate>
+
+            </ContentControl.Resources>
+        </ContentControl>
+    </Grid>
+</UserControl>

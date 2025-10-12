@@ -4,6 +4,11 @@
              xmlns:local="clr-namespace:justsayo_win"
              StartupUri="MainWindow.xaml">
     <Application.Resources>
-         
+        <local:EnumToBooleanConverter x:Key="EnumToBooleanConverter"/>
+        <local:SubmodStatusToVisibilityConverter x:Key="SubmodStatusToVisibilityConverter"/>
+        <local:BooleanInverterConverter x:Key="BooleanInverterConverter"/>
+        <local:InverseBooleanToVisibilityConverter x:Key="InverseBooleanToVisibilityConverter"/>
+        <local:AndLogicMultiConverter x:Key="AndLogicMultiConverter"/>
+        <BooleanToVisibilityConverter x:Key="BooleanToVisibilityConverter"/>
     </Application.Resources>
 </Application>
