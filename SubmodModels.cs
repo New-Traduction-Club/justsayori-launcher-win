@@ -91,3 +91,9 @@ public class SubmodItem : INotifyPropertyChanged
     }
     #endregion
 }
+
+public class InstalledSubmodInfo
+{
+    public string Version { get; set; } = "";
+    public List<string> InstalledFiles { get; set; } = new();
+}

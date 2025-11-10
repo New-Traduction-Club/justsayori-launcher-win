@@ -23,8 +23,10 @@ public class MainViewModel : INotifyPropertyChanged
     private readonly string _launcherDataDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "launcher_data");
     private readonly string _storedDdlcZipPath;
     private readonly string _settingsFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "launcher_data", "settings.json");
-    private readonly string _installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "JustSayori");
+    private string _installDir;
     private string _executablePath = "";
+
+    public string InstallDirectory => _installDir;
 
     private static readonly HttpClient _httpClient = new();
     private GameInfo? _remoteGameInfo;
@@ -87,6 +89,8 @@ public class MainViewModel : INotifyPropertyChanged
     public ICommand CancelInstallCommand { get; }
     public ICommand LocateFolderCommand { get; }
 
+    public ICommand ChangeInstallDirCommand { get; }
+
     private enum ActionState { Checking, SelectDdlc, Install, Update, Play }
 
     public bool IsGameInstalled => _currentState == ActionState.Play || _currentState == ActionState.Update;
@@ -96,6 +100,11 @@ public class MainViewModel : INotifyPropertyChanged
     public MainViewModel()
     {
         LoadSettings();
+
+        _installDir = !string.IsNullOrEmpty(_settings.InstallPath) && Directory.Exists(Path.GetDirectoryName(_settings.InstallPath))
+        ? _settings.InstallPath
+        : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "JustSayori");
+
         _currentView = new PlayView { DataContext = this };
 
         _storedDdlcZipPath = Path.Combine(_launcherDataDir, DdlcZipFileName);
@@ -107,6 +116,8 @@ public class MainViewModel : INotifyPropertyChanged
         CancelUninstallCommand = new RelayCommand(_ => IsConfirmingUninstall = false);
         CancelInstallCommand = new RelayCommand(CancelInstallation);
         LocateFolderCommand = new AsyncRelayCommand(LocateGameFolder);
+        ChangeInstallDirCommand = new AsyncRelayCommand(ChangeInstallDirAsync);
+
 
         _animationTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
         _animationTimer.Tick += AnimationTimer_Tick;
@@ -115,6 +126,79 @@ public class MainViewModel : INotifyPropertyChanged
         _processCheckTimer.Tick += ProcessCheckTimer_Tick;
 
         _ = CheckGameStatusAsync();
+    }
+
+    private async Task ChangeInstallDirAsync()
+    {
+        var oldInstallDir = _installDir;
+        using var dialog = new System.Windows.Forms.FolderBrowserDialog
+        {
+            Description = "Select a folder to install Just Sayori",
+            UseDescriptionForTitle = true,
+            SelectedPath = Directory.Exists(_installDir) ? _installDir : Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles)
+        };
+
+        if (dialog.ShowDialog() == System.Windows.Forms.DialogResult.OK) 
+        {
+            var newInstallDir = Path.Combine(dialog.SelectedPath, "JustSayori");
+
+            if (string.Equals(oldInstallDir, newInstallDir, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            var gameWasInstalled = IsGameInstalled && Directory.Exists(oldInstallDir);
+            var action = MoveGameResult.ChangePath;
+            MoveGameDialog? moveDialog = null;
+
+            if (gameWasInstalled)
+            {
+                moveDialog = new MoveGameDialog
+                {
+                    Owner = System.Windows.Application.Current.MainWindow
+                };
+                moveDialog.ShowDialog();
+                action = moveDialog.Result;
+            }
+
+            if (action == MoveGameResult.Cancel) return;
+
+            try
+            {
+                switch (action)
+                {
+                    case MoveGameResult.Move:
+                        moveDialog?.ShowProgress("Moving files...");
+                        await Task.Run(() =>
+                        {
+                            CopyDirectory(oldInstallDir, newInstallDir);
+                            Directory.Delete(oldInstallDir, true);
+                        });
+                        break;
+                    case MoveGameResult.Delete:
+                        moveDialog?.ShowProgress("Deleting old installation...");
+                        await Task.Run(() => Directory.Delete(oldInstallDir, true));
+                        _submodsViewModel?.HandleMainGameUninstalled();
+                        break;
+                    case MoveGameResult.ChangePath:
+                        break;
+                }
+
+                _installDir = newInstallDir;
+                _settings.InstallPath = _installDir;
+                SaveSettings();
+                OnPropertyChanged(nameof(InstallDirectory));
+            }
+            catch (Exception ex)
+            {
+                System.Windows.MessageBox.Show($"An error occurred: {ex.Message}", "Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+            finally
+            {
+                moveDialog?.Close();
+                _ = CheckGameStatusAsync();
+            }
+        }
     }
 
     private void CancelInstallation(object? _ = null)
@@ -130,7 +214,14 @@ public class MainViewModel : INotifyPropertyChanged
                 CurrentView = new PlayView { DataContext = this };
                 break;
             case "Submods":
-                _submodsViewModel ??= new SubmodsViewModel(_installDir, IsGameInstalled);
+                if (_submodsViewModel == null)
+                {
+                    _submodsViewModel = new SubmodsViewModel(_installDir, IsGameInstalled);
+                }
+                else
+                {
+                    _submodsViewModel.UpdateInstallDir(_installDir, IsGameInstalled);
+                }
                 CurrentView = new SubmodsView { DataContext = _submodsViewModel };
                 break;
             case "Settings":
@@ -379,66 +470,69 @@ public class MainViewModel : INotifyPropertyChanged
 
         try
         {
-            // Cleanup old directories
-            if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
-            Directory.CreateDirectory(tempDir);
-            if (_currentState == ActionState.Update && Directory.Exists(_installDir))
+            await Task.Run(async () =>
             {
-                Directory.Delete(_installDir, true);
-            }
-            Directory.CreateDirectory(_installDir);
+                token.ThrowIfCancellationRequested();
 
-            StatusText = "Downloading patch...";
-            var patchZipPath = Path.Combine(tempDir, "patch.zip");
-            await DownloadFileAsync(_remoteGameInfo.DownloadUrl, patchZipPath, token);
+                // cleanup old directories
+                if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true);
+                Directory.CreateDirectory(tempDir);
+                if (_currentState == ActionState.Update && Directory.Exists(_installDir))
+                {
+                    Directory.Delete(_installDir, true);
+                }
+                Directory.CreateDirectory(_installDir);
 
-            var ddlcExtractPath = Path.Combine(tempDir, "ddlc");
-            var patchExtractPath = Path.Combine(tempDir, "patch");
-            _baseButtonText = "Extracting";
-            StatusText = "Extracting base game...";
-            await Task.Run(() => ZipFile.ExtractToDirectory(_storedDdlcZipPath, ddlcExtractPath));
-            token.ThrowIfCancellationRequested();
-            StatusText = "Extracting patch...";
-            await Task.Run(() => ZipFile.ExtractToDirectory(patchZipPath, patchExtractPath));
-            token.ThrowIfCancellationRequested();
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { StatusText = "Downloading patch..."; });
+                var patchZipPath = Path.Combine(tempDir, "patch.zip");
+                await DownloadFileAsync(_remoteGameInfo.DownloadUrl, patchZipPath, token);
 
-            _baseButtonText = "Installing";
-            StatusText = "Installing...";
-            await Task.Run(() =>
-            {
+                var ddlcExtractPath = Path.Combine(tempDir, "ddlc");
+                var patchExtractPath = Path.Combine(tempDir, "patch");
+
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    _baseButtonText = "Extracting";
+                    StatusText = "Extracting base game...";
+                });
+                ZipFile.ExtractToDirectory(_storedDdlcZipPath, ddlcExtractPath);
+                token.ThrowIfCancellationRequested();
+
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() => { StatusText = "Extracting patch..."; });
+                ZipFile.ExtractToDirectory(patchZipPath, patchExtractPath);
+                token.ThrowIfCancellationRequested();
+
+                await System.Windows.Application.Current.Dispatcher.InvokeAsync(() =>
+                {
+                    _baseButtonText = "Installing";
+                    StatusText = "Installing...";
+                });
+
                 var ddlcGameDir = GetFirstSubDirectory(ddlcExtractPath);
                 if (ddlcGameDir == null) throw new DirectoryNotFoundException("Could not find the main game directory inside ddlc-win.zip.");
 
                 // Copy DDLC files to the final install directory
                 CopyDirectory(ddlcGameDir, _installDir);
 
-                var patchSourceDir = GetFirstSubDirectory(patchExtractPath);
-                if (patchSourceDir == null)
-                {
-                    // If no subfolder, the patch files are likely at the root of the zip.
-                    patchSourceDir = patchExtractPath;
-                }
+                var patchSourceDir = GetFirstSubDirectory(patchExtractPath) ?? patchExtractPath;
 
                 // Copy the patch files over the top of the DDLC installation
                 CopyDirectory(patchSourceDir, _installDir);
 
                 var scriptFileToDelete = Path.Combine(_installDir, "game", "scripts.rpa");
-                if (File.Exists(scriptFileToDelete))
-                {
-                    File.Delete(scriptFileToDelete);
-                }
-            });
+                if (File.Exists(scriptFileToDelete)) File.Delete(scriptFileToDelete);
+
+            }, token);
 
             var versionFilePath = Path.Combine(_installDir, "version.txt");
-            await File.WriteAllTextAsync(versionFilePath, _remoteGameInfo.Version);
+            await File.WriteAllTextAsync(versionFilePath, _remoteGameInfo.Version, token);
 
             UpdateState(ActionState.Play, "Installation complete!", "Play");
         }
         catch (OperationCanceledException)
         {
             StatusText = "Installation cancelled.";
-            ButtonText = "Install";
-            IsButtonEnabled = true;
+            await CheckGameStatusAsync();
             Debug.WriteLine("Installation was cancelled by the user.");
         }
         catch (Exception ex)
@@ -459,6 +553,10 @@ public class MainViewModel : INotifyPropertyChanged
             if (Directory.Exists(tempDir))
             {
                 try { Directory.Delete(tempDir, true); } catch { /* ignore cleanup errors */ }
+            }
+            if (_currentState != ActionState.Play)
+            {
+                await CheckGameStatusAsync();
             }
         }
     }

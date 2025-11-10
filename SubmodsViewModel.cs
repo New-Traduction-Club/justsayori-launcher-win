@@ -9,22 +9,23 @@ using System.Runtime.CompilerServices;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Input;
+using System.Xml.Linq;
 
 namespace justsayo_win;
 
 public class SubmodsViewModel : INotifyPropertyChanged
 {
     private const string SubmodsJsonUrl = "https://traduction-club.live/api/justsayori/justsayori_submods.json";
-    private readonly string _installDir;
+    private string _installDir;
     private readonly string _submodStatusFilePath;
 
     private static readonly HttpClient _httpClient = new();
     private List<SubmodItem> _allSubmods = new();
-    private Dictionary<string, string> _installedSubmodVersions = new();
+    private Dictionary<string, InstalledSubmodInfo> _installedSubmodStatus = new();
     private object? _currentSubmodView;
     private SubmodType _selectedFilter = SubmodType.Submod;
 
-    public bool IsMainGameInstalled { get; }
+    public bool IsMainGameInstalled { get; private set; }
     public ObservableCollection<SubmodItem> FilteredSubmods { get; } = new();
     public object? CurrentSubmodView
     {
@@ -66,6 +67,12 @@ public class SubmodsViewModel : INotifyPropertyChanged
         _ = LoadSubmodsAsync();
     }
 
+    public void UpdateInstallDir(string newPath, bool isInstalled)
+    {
+        _installDir = newPath;
+        IsMainGameInstalled = isInstalled;
+    }
+
     private async Task LoadSubmodsAsync()
     {
         LoadInstalledSubmodStatus();
@@ -83,9 +90,9 @@ public class SubmodsViewModel : INotifyPropertyChanged
 
             foreach (var submod in _allSubmods)
             {
-                if (_installedSubmodVersions.TryGetValue(submod.Id, out var installedVersion))
+                if (_installedSubmodStatus.TryGetValue(submod.Id, out var installedInfo))
                 {
-                    submod.Status = (submod.Type == SubmodType.Submod && submod.Version != installedVersion)
+                    submod.Status = (submod.Type == SubmodType.Submod && submod.Version != installedInfo.Version)
                         ? SubmodStatus.UpdateAvailable
                         : SubmodStatus.Installed;
                 }
@@ -164,22 +171,29 @@ public class SubmodsViewModel : INotifyPropertyChanged
 
             var sourceDir = GetFirstSubDirectory(extractPath) ?? extractPath;
 
+            List<string> installedFiles;
             switch (submod.Type)
             {
                 case SubmodType.Submod:
                     var submodsFolder = Path.Combine(_installDir, "game", "submods");
                     Directory.CreateDirectory(submodsFolder);
                     var targetSubmodDir = Path.Combine(submodsFolder, new DirectoryInfo(sourceDir).Name);
-                    CopyDirectory(sourceDir, targetSubmodDir);
+                    installedFiles = CopyDirectory(sourceDir, targetSubmodDir);
                     break;
 
                 case SubmodType.Background:
                 case SubmodType.Outfit:
-                    CopyDirectory(sourceDir, _installDir);
+                    installedFiles = CopyDirectory(sourceDir, _installDir);
                     break;
+                default:
+                    throw new InvalidOperationException("Unsupported submod type for installation.");
             }
 
-            _installedSubmodVersions[submod.Id] = submod.Version;
+            _installedSubmodStatus[submod.Id] = new InstalledSubmodInfo
+            {
+                Version = submod.Version,
+                InstalledFiles = installedFiles
+            };
             submod.Status = SubmodStatus.Installed;
             SaveInstalledSubmodStatus();
             System.Windows.MessageBox.Show($"{submod.Name} installed successfully!", "Success");
@@ -201,10 +215,10 @@ public class SubmodsViewModel : INotifyPropertyChanged
 
     private async Task UninstallSubmod(SubmodItem? submod)
     {
-        if (submod == null || submod.Type != SubmodType.Submod) return;
+        if (submod == null) return;
 
         var result = System.Windows.MessageBox.Show(
-            $"This will attempt to delete the folder for '{submod.Name}' from your 'game/submods' directory. This action cannot be undone. Are you sure?",
+            $"This will delete all files associated with '{submod.Name}'. This action cannot be undone. Are you sure?",
             "Confirm Uninstall",
             MessageBoxButton.YesNo,
             MessageBoxImage.Warning);
@@ -213,26 +227,26 @@ public class SubmodsViewModel : INotifyPropertyChanged
 
         try
         {
-            var submodsFolder = Path.Combine(_installDir, "game", "submods");
-            if (!Directory.Exists(submodsFolder))
+            if (_installedSubmodStatus.TryGetValue(submod.Id, out var installedInfo))
             {
-                throw new DirectoryNotFoundException("The 'game/submods' folder does not exist.");
-            }
+                await Task.Run(() =>
+                {
+                    foreach (var file in installedInfo.InstalledFiles.Reverse<string>())
+                    {
+                        if (File.Exists(file)) File.Delete(file);
+                        else if (Directory.Exists(file)) Directory.Delete(file, false);
+                    }
+                });
 
-            var submodDirToDelete = Directory.GetDirectories(submodsFolder)
-                .FirstOrDefault(d => d.EndsWith(submod.Id.Split('.').Last(), StringComparison.OrdinalIgnoreCase));
-
-            if (submodDirToDelete != null && Directory.Exists(submodDirToDelete))
-            {
-                await Task.Run(() => Directory.Delete(submodDirToDelete, true));
-                _installedSubmodVersions.Remove(submod.Id);
+                _installedSubmodStatus.Remove(submod.Id);
                 submod.Status = SubmodStatus.NotInstalled;
                 SaveInstalledSubmodStatus();
                 System.Windows.MessageBox.Show($"{submod.Name} has been uninstalled.", "Success");
             }
             else
             {
-                System.Windows.MessageBox.Show($"Could not find the directory for '{submod.Name}' to uninstall. You may need to remove it manually.", "Directory Not Found");
+                System.Windows.MessageBox.Show($"Could not find installation info for '{submod.Name}'. You may need to reset its status.", "Info Not Found");
+                submod.Status = SubmodStatus.NotInstalled;
             }
         }
         catch (Exception ex)
@@ -253,7 +267,7 @@ public class SubmodsViewModel : INotifyPropertyChanged
 
         if (result == MessageBoxResult.Yes)
         {
-            if (_installedSubmodVersions.Remove(submod.Id))
+            if (_installedSubmodStatus.Remove(submod.Id))
             {
                 submod.Status = SubmodStatus.NotInstalled;
                 SaveInstalledSubmodStatus();
@@ -269,13 +283,13 @@ public class SubmodsViewModel : INotifyPropertyChanged
             if (File.Exists(_submodStatusFilePath))
             {
                 var json = File.ReadAllText(_submodStatusFilePath);
-                _installedSubmodVersions = JsonSerializer.Deserialize<Dictionary<string, string>>(json) ?? new();
+                _installedSubmodStatus = JsonSerializer.Deserialize<Dictionary<string, InstalledSubmodInfo>>(json) ?? new();
             }
         }
         catch (Exception ex)
         {
             Debug.WriteLine($"Failed to load submod status: {ex.Message}");
-            _installedSubmodVersions = new();
+            _installedSubmodStatus = new();
         }
     }
 
@@ -283,7 +297,7 @@ public class SubmodsViewModel : INotifyPropertyChanged
     {
         try
         {
-            var json = JsonSerializer.Serialize(_installedSubmodVersions, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(_installedSubmodStatus, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(_submodStatusFilePath, json);
         }
         catch (Exception ex)
@@ -294,7 +308,7 @@ public class SubmodsViewModel : INotifyPropertyChanged
 
     public void HandleMainGameUninstalled()
     {
-        _installedSubmodVersions.Clear();
+        _installedSubmodStatus.Clear();
         foreach (var submod in _allSubmods)
         {
             submod.Status = SubmodStatus.NotInstalled;
@@ -309,24 +323,29 @@ public class SubmodsViewModel : INotifyPropertyChanged
         return directories.Length > 0 ? directories[0] : null;
     }
 
-    private static void CopyDirectory(string sourceDir, string destinationDir)
+    private static List<string> CopyDirectory(string sourceDir, string destinationDir)
     {
+        var copiedFiles = new List<string>();
         var dir = new DirectoryInfo(sourceDir);
         if (!dir.Exists) throw new DirectoryNotFoundException($"Source directory not found: {dir.FullName}");
 
         Directory.CreateDirectory(destinationDir);
+        copiedFiles.Add(destinationDir);
 
         foreach (FileInfo file in dir.GetFiles())
         {
             string targetFilePath = Path.Combine(destinationDir, file.Name);
             file.CopyTo(targetFilePath, true);
+            copiedFiles.Add(targetFilePath);
         }
 
         foreach (DirectoryInfo subDir in dir.GetDirectories())
         {
             string newDestinationDir = Path.Combine(destinationDir, subDir.Name);
-            CopyDirectory(subDir.FullName, newDestinationDir);
+            copiedFiles.AddRange(CopyDirectory(subDir.FullName, newDestinationDir));
         }
+
+        return copiedFiles;
     }
 
     #region INotifyPropertyChanged

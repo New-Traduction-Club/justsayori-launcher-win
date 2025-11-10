@@ -10,4 +10,5 @@ public enum OnLaunchBehavior
 public class SettingsModel
 {
     public OnLaunchBehavior LaunchBehavior { get; set; } = OnLaunchBehavior.DoNothing;
+    public string? InstallPath { get; set; }
 }

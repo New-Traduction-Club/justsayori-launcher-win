@@ -54,6 +54,21 @@
                                      Visibility="{Binding IsUninstalling, Converter={StaticResource BooleanToVisibilityConverter}}" 
                                      BorderThickness="0" Background="Transparent" Foreground="#FFF38BA8"/>
 
+                        <!-- installation directory -->
+                        <TextBlock Text="Installation Directory" Foreground="White" Margin="0,25,0,10" FontWeight="SemiBold"/>
+                        <TextBlock Text="This is where the game files are located." Foreground="#CCFFFFFF" TextWrapping="Wrap" Margin="0,0,0,10"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBox Grid.Column="0" Text="{Binding InstallDirectory, Mode=OneWay}" IsReadOnly="True" VerticalContentAlignment="Center"
+                                     Background="#11FFFFFF" Foreground="#CCFFFFFF" BorderThickness="0" Padding="8,5"/>
+                            <Button Grid.Column="1" Content="Change" Command="{Binding ChangeInstallDirCommand}"
+                                    Background="#44FFFFFF" Foreground="White"
+                                    FontSize="14" FontWeight="Bold" Padding="15,8" Margin="10,0,0,0" BorderThickness="0"/>
+                        </Grid>
+
                     </StackPanel>
                 </Border>
 
