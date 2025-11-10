@@ -370,6 +370,13 @@ public class MainViewModel : INotifyPropertyChanged
         _dotCount = 0;
         _animationTimer.Start();
 
+        if (_currentState == ActionState.Update && !File.Exists(_storedDdlcZipPath))
+        {
+            _animationTimer.Stop();
+            UpdateState(ActionState.SelectDdlc, "The original ddlc-win.zip is required to update. Please select it.", "Select ddlc-win.zip");
+            return;
+        }
+
         try
         {
             // Cleanup old directories
